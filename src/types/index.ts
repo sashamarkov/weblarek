@@ -6,12 +6,12 @@ export interface IApi {
 }
 
 export interface Product {
-    id:string;
-    description: string;
-    image: string;
-    title: string;
-    category: string;
-    price: number | null;
+  id: string;
+  description: string;
+  image: string;
+  title: string;
+  category: string;
+  price: number | null;
 }
 
 export interface OrderData {
@@ -26,4 +26,18 @@ export interface ValidationResult {
   email?: string;
   phone?: string;
   address?: string;
+}
+
+export interface OrderRequest {
+  payment: 'card' | 'cash';
+  email: string;
+  phone: string;
+  address: string;
+  total: number;
+  items: string[];
+}
+
+export interface ProductListResponse {
+  total: number;
+  items: Product[];
 }
