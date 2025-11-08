@@ -172,7 +172,7 @@ constructor()
 
 ### Класс OrderManager
 
-**Назначение:** Управляет данными покупателя при оформлении заказа. Обеспечивает валидацию и сохранение информации о заказе.
+**Назначение:** Управляет данными покупателя при оформлении заказа. Обеспечивает сохранение информации о заказе, валидацию и формирование запроса для API.
 
 **Конструктор:**
 ```typescript
@@ -191,6 +191,54 @@ constructor()
 - `getOrderData(): OrderData` - возвращает все данные покупателя
 - `clear(): void` - очищает все данные покупателя
 - `validate(): ValidationResult` - проверяет валидность данных
+- `createRequest(cart: ShoppingCart): OrderRequest` - создает объект запроса для API на основе текущих данных и корзины товаров
+
+**Подробное описание createRequest:**
+
+Метод createRequest формирует объект OrderRequest для отправки на сервер, объединяя данные покупателя из текущего экземпляра OrderManager с информацией о товарах из корзины.
+
+**Параметры:**
+
+`cart: ShoppingCart` - экземпляр корзины с товарами
+
+**Возвращает:**
+
+`OrderRequest` - объект с полными данными для отправки заказа
+
+**Логика работы:**
+
+1. Проверяет валидность текущих данных покупателя
+2. Проверяет, что корзина не пуста
+3. Формирует объект запроса с полями:
+- payment - способ оплаты из orderData
+- email, phone, address - контактные данные
+- total - общая стоимость из корзины
+- items - массив ID товаров из корзины
+
+**Пример использования:**
+
+```typescript
+const orderManager = new OrderManager();
+orderManager.setPayment('card');
+orderManager.setEmail('user@example.com');
+orderManager.setPhone('+79161234567');
+orderManager.setAddress('ул. Ленина, д. 1');
+
+const shoppingCart = new ShoppingCart();
+shoppingCart.addItem(product1);
+shoppingCart.addItem(product2);
+
+// Формируем запрос для API
+const orderRequest = orderManager.createRequest(shoppingCart);
+
+// Отправляем на сервер
+const response = await appAPI.submitOrder(orderRequest);
+```
+
+**Ошибки:**
+
+- Выбрасывает ошибку, если данные покупателя не прошли валидацию
+- Выбрасывает ошибку, если корзина пуста
 
 **Интерфейс валидации:**
 ```typescript

@@ -1,4 +1,5 @@
-import { IApi, Product, OrderRequest } from '../../types';
+import { IApi, Product, OrderRequest, OrderResponse } from '../../types';
+import { logger } from '../../utils/logger';
 
 export class AppAPI {
   constructor(private api: IApi) {}
@@ -8,17 +9,17 @@ export class AppAPI {
       const response = await this.api.get<{ total: number; items: Product[] }>('/product/');
       return response.items;
     } catch (error) {
-      console.error('Ошибка при получении списка товаров:', error);
+      logger.error('Ошибка при получении списка товаров:', error);
       throw error;
     }
   }
 
-  async submitOrder(orderData: OrderRequest): Promise<void> {
+  async submitOrder(orderData: OrderRequest): Promise<OrderResponse> {
     try {
-      await this.api.post('/order/', orderData);
-      console.log('Заказ успешно отправлен на сервер');
+      const response = await this.api.post<OrderResponse>('/order/', orderData);
+      return response;
     } catch (error) {
-      console.error('Ошибка при отправке заказа:', error);
+      logger.error('Ошибка при отправке заказа:', error);
       throw error;
     }
   }

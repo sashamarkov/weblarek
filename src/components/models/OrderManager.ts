@@ -1,4 +1,5 @@
-import { OrderData, ValidationResult } from '../../types';
+import { OrderData, OrderRequest, ValidationResult } from '../../types';
+import { ShoppingCart } from './ShoppingCart';
 
 export class OrderManager {
   private orderData: OrderData = {
@@ -7,6 +8,27 @@ export class OrderManager {
     phone: '',
     address: ''
   };
+
+  createRequest(cart:ShoppingCart): OrderRequest {
+    const errors = this.validate();
+    if (Object.keys(errors).length > 0) {
+      throw new Error('Не все данные заполнены: ' + Object.values(errors).join(', '));
+    }
+
+    // Проверяем, что корзина не пуста
+    if (cart.getItemsCount() === 0) {
+      throw new Error('Корзина пуста');
+    }
+    const payment = this.orderData.payment as 'card' | 'cash';
+    return {
+      payment: payment,
+      email: this.orderData.email,
+      phone: this.orderData.phone,
+      address: this.orderData.address,
+      total: cart.getTotalPrice(),
+      items: cart.getItems().map(item => item.id)
+    };
+  }
 
   setPayment(payment: 'card' | 'cash'): void {
     this.orderData.payment = payment;

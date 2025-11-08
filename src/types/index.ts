@@ -41,3 +41,8 @@ export interface ProductListResponse {
   total: number;
   items: Product[];
 }
+
+export interface OrderResponse {
+  id: string;
+  total: number;
+}
