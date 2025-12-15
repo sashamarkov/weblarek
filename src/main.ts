@@ -1,256 +1,465 @@
 import './scss/styles.scss';
-import { apiProducts } from './utils/data';
+
+import { EventEmitter } from './components/base/Events';
+import { Api } from './components/base/Api';
+import { AppAPI } from './components/api/AppAPI';
+import { API_URL } from './utils/constants';
+
 import { ProductCollection } from './components/models/ProductCollection';
 import { ShoppingCart } from './components/models/ShoppingCart';
 import { OrderManager } from './components/models/OrderManager';
-import { AppAPI } from './components/api/AppAPI';
-import { Api } from './components/base/Api';
-import { API_URL } from './utils/constants';
-import { logger } from './utils/logger';
 
-const fakeAddress: string = 'ул. Ленина, д. 1';
-const fakeEmail: string = 'test@example.com';
-const fakeTelephone: string = '+79161234567';
+import { 
+  Page, 
+  Header, 
+  Modal, 
+  createCatalogCard,
+  createPreviewCard,
+  createBasketCard,
+  createBasketView,
+  createOrderForm,
+  createContactsForm,
+  createSuccessView
+} from './components/view';
 
-// Тестирование моделей данных
-function testModels() {
-  logger.group('=== ProductCollection ===');
-  const productCollection = new ProductCollection();
-    
-  // Тест 1: Установка и получение товаров
-  productCollection.setProducts(apiProducts.items);
-  logger.log('Получение всех товаров', productCollection.getProducts());
-  logger.log('Количество товаров', productCollection.getProducts().length);
+import { Product } from './types';
+import { ensureElement } from './utils/utils';
 
-  // Тест 2: Получение товара по ID
-  const firstProduct = apiProducts.items[0];
-  const productById = productCollection.getProductById(firstProduct.id);
-  logger.log('Товар по ID', productById);
-  logger.test('ID совпадает?', productById?.id === firstProduct.id);
+import { runTests } from './tests';
 
-  // Тест 3: Работа с выбранным товаром
-  productCollection.setSelectedProduct(firstProduct);
-  const selectedProduct = productCollection.getSelectedProduct();
-  logger.log('Выбранный товар', selectedProduct);
-  logger.test('Выбранный товар совпадает?', selectedProduct?.id === firstProduct.id);
 
-  // Тест 4: Получение несущесвующего товара
-  const nonExistentProduct = productCollection.getProductById('0');
-  logger.log('Несуществующий товар', nonExistentProduct);
-  logger.test('Несуществующий товар = undefined?', nonExistentProduct === undefined);
-  logger.groupEnd();
+// Типы для событий
+type CardSelectEvent = { id: string };
+type CardActionEvent = { id: string };
+type BasketRemoveEvent = { id: string };
+type PaymentChangeEvent = { payment: string };
+type AddressChangeEvent = { address: string };
+type EmailChangeEvent = { email: string };
+type PhoneChangeEvent = { phone: string };
+type OrderSubmitEvent = { payment: string, address: string };
+type ContactsSubmitEvent = { email: string, phone: string };
+
+// Инициализация приложения
+class App {
+  private events: EventEmitter;
+  private api: Api;
+  private appApi: AppAPI;
   
-  logger.group('=== ShoppingCart ===');
-  const shoppingCart = new ShoppingCart();
-    
-  // Тест 1: Начальное состояние
-  logger.log('Начальное количество товаров', shoppingCart.getItemsCount());
-  logger.log('Начальная сумма', shoppingCart.getTotalPrice());
-  logger.test('Корзина пуста?', shoppingCart.getItems().length === 0);
-    
-  // Тест 2: Добавление товаров
-  const product1 = apiProducts.items[0];
-  const product2 = apiProducts.items[1];
-  const product3 = apiProducts.items[2]; // товар без цены
-    
-  shoppingCart.addItem(product1);
-  shoppingCart.addItem(product2);
-  shoppingCart.addItem(product3);
-    
-  logger.log('Товары после добавления', shoppingCart.getItems());
-  logger.log('Количество после добавления', shoppingCart.getItemsCount());
-  logger.log('Сумма после добавления', shoppingCart.getTotalPrice());
-    
-  // Тест 3: Проверка наличия товаров
-  logger.test('Товар 1 в корзине?', shoppingCart.hasItem(product1.id));
-  logger.test('Товар 2 в корзине?', shoppingCart.hasItem(product2.id));
-  logger.test('Несуществующий товар отсутсвует в корзине?', !shoppingCart.hasItem('0'));
-    
-  // Тест 4: Удаление товара
-  const total = shoppingCart.getTotalPrice();
-  shoppingCart.removeItem(product1.id);
-  logger.log('Товары после удаления', shoppingCart.getItems());
-  logger.log('Количество после удаления', shoppingCart.getItemsCount());
-  logger.log('Сумма после удаления', shoppingCart.getTotalPrice());
-  logger.test('Сумма соотвествует?', shoppingCart.getTotalPrice() === (total - product1.price));
-  logger.test('Товар 1 удалён?', !shoppingCart.hasItem(product1.id));
-  logger.test('Товар 2 остался?', shoppingCart.hasItem(product2.id));
-    
-  // Тест 5: Очистка корзины
-  shoppingCart.clear();
-  logger.log('Товары после очистки', shoppingCart.getItems());
-  logger.log('Количество после очистки', shoppingCart.getItemsCount());
-  logger.log('Сумма после очистки', shoppingCart.getTotalPrice());
-  logger.test('Корзина пуста после очистки?', shoppingCart.getItemsCount() === 0);
-    
-  logger.groupEnd();
-
-  // Тестирование OrderManager
-  logger.group('=== OrderManager ===');
-  const orderManager = new OrderManager();
-    
-  // Тест 1: Начальное состояние
-  logger.log('Начальные данные', orderManager.getOrderData());
-    
-  // Тест 2: Установка данных по отдельности
-  orderManager.setPayment('card');
-  orderManager.setAddress(fakeAddress);
-  orderManager.setEmail(fakeEmail);
-  orderManager.setPhone(fakeTelephone);
-    
-  const filledData = orderManager.getOrderData();
-  logger.log('Данные после заполнения', filledData);
-  logger.test('Payment установлен?', filledData.payment === 'card');
-  logger.test('Address установлен?', filledData.address === fakeAddress);
-  logger.test('Email установлен?', filledData.email === fakeEmail);
-  logger.test('Phone установлен?', filledData.phone === fakeTelephone);
-    
-  // Тест 3: Валидация корректных данных
-  const validationResult = orderManager.validate();
-  logger.log('Валидация корректных данных', validationResult);
-  logger.test('Ошибки валидации отсутствуют?', Object.keys(validationResult).length === 0);
-    
-  // Тест 4: Валидация пустых данных
-  const emptyOrderManager = new OrderManager();
-  const emptyValidation = emptyOrderManager.validate();
-  logger.log('Валидация пустых данных', emptyValidation);
-  logger.test('Ошибка payment', emptyValidation.payment === 'Не выбран способ оплаты');
-  logger.test('Ошибка address', emptyValidation.address === 'Укажите адрес доставки');
-  logger.test('Ошибка email', emptyValidation.email === 'Укажите email');
-  logger.test('Ошибка phone', emptyValidation.phone === 'Укажите телефон');
-    
-  // Тест 5: Валидация частично заполненных данных
-  const partialOrderManager = new OrderManager();
-  partialOrderManager.setAddress(fakeAddress);
-  partialOrderManager.setEmail(fakeEmail);
-  const partialValidation = partialOrderManager.validate();
-  logger.log('Валидация частичных данных', partialValidation);
-  logger.test('Ошибка payment осталась?', partialValidation.payment === 'Не выбран способ оплаты');
-  logger.test('Ошибка phone осталась?', partialValidation.phone === 'Укажите телефон');
-  logger.test('Нет ошибки address?', !partialValidation.address);
-  logger.test('Нет ошибки email?', !partialValidation.email);
-    
-  // Тест 6: Очистка данных
-  orderManager.clear();
-  const clearedData = orderManager.getOrderData();
-  logger.log('Данные после очистки', clearedData);
-  logger.test('Payment очищен?', clearedData.payment === '');
-  logger.test('Address очищен?', clearedData.address === '');
-  logger.test('Email очищен?', clearedData.email === '');
-  logger.test('Phone очищен?', clearedData.phone === '');
-
-  // Тест 7: Формирование корректного запроса на сервер
-  orderManager.setPayment('card');
-  orderManager.setAddress(fakeAddress);
-  orderManager.setEmail(fakeEmail);
-  orderManager.setPhone(fakeTelephone);
-  shoppingCart.addItem(product1);
-  shoppingCart.addItem(product2);
-  shoppingCart.addItem(product3);
-  const order = orderManager.createRequest(shoppingCart);
-  logger.log('Формирование запроса на сервер: ', order);
-  const cartItems = shoppingCart.getItems();
-  logger.test('Количество товаров в корзине и запросе совпадают?', shoppingCart.getItemsCount() === order.items.length);
-  logger.test('Суммы в корзине и запросе совпадают?', shoppingCart.getTotalPrice() === order.total);
-  logger.test('В корзине и запросе одни и те же товары?', cartItems[0].id === order.items[0] && cartItems[1].id === order.items[1] && cartItems[2].id === order.items[2]);
+  private productCollection: ProductCollection;
+  private shoppingCart: ShoppingCart;
+  private orderManager: OrderManager;
   
-  // Тест 8: Формирование запроса на сервер при отсутсвующих данных
-  orderManager.setAddress('');
-  try {
-    orderManager.createRequest(shoppingCart);
-  } catch(error)  {
-    logger.test('Если не указать адрес, то запрос не сформируется?', true);
-    logger.log(error);
+  private page: Page;
+  private header: Header;
+  private modal: Modal;
+  
+  constructor() {
+    // 1. Инициализация событий и API
+    this.events = new EventEmitter();
+    this.api = new Api(API_URL);
+    this.appApi = new AppAPI(this.api);
+    
+    // 2. Инициализация моделей
+    this.productCollection = new ProductCollection();
+    this.shoppingCart = new ShoppingCart();
+    this.orderManager = new OrderManager();
+    
+    // 3. Инициализация представлений
+    this.page = new Page(ensureElement<HTMLElement>('.page__wrapper'));
+    this.header = new Header(ensureElement<HTMLElement>('.header'), this.events);
+    this.modal = new Modal(ensureElement<HTMLElement>('#modal-container'));
+    
+    // 4. Настройка обработчиков событий
+    this.setupEventListeners();
+    
+    // 5. Загрузка товаров с сервера
+    this.loadProducts();
   }
-  orderManager.setAddress(fakeAddress);
-  orderManager.setEmail('');
-  try {
-    orderManager.createRequest(shoppingCart);
-  } catch(error)  {
-    logger.test('Если не указать email, то запрос не сформируется?', true);
-    logger.log(error);
+  
+  /**
+   * Настройка всех обработчиков событий
+   */
+  private setupEventListeners(): void {
+    // События от моделей
+    this.productCollection.on('products:changed', this.renderCatalog.bind(this));
+    this.productCollection.on('product:selected', this.showProductModal.bind(this));
+    this.shoppingCart.on('basket:changed', this.updateBasket.bind(this));
+    this.orderManager.on('order:changed', this.updateOrderForm.bind(this));
+    
+    // События от представлений с явной типизацией
+    this.events.on<CardSelectEvent>('card:select', this.handleCardSelect.bind(this));
+    this.events.on<CardActionEvent>('card:add', this.handleCardAdd.bind(this));
+    this.events.on<CardActionEvent>('card:remove', this.handleCardRemove.bind(this));
+    this.events.on<BasketRemoveEvent>('basket:remove', this.handleBasketRemove.bind(this));
+    
+    this.events.on('header:basket', this.openBasket.bind(this));
+    this.events.on('basket:order', this.openOrderForm.bind(this));
+    
+    this.events.on<OrderSubmitEvent>('order:submit', this.handleOrderSubmit.bind(this));
+    this.events.on<ContactsSubmitEvent>('contacts:submit', this.handleContactsSubmit.bind(this));
+    
+    this.events.on<PaymentChangeEvent>('order.payment:change', this.handlePaymentChange.bind(this));
+    this.events.on<AddressChangeEvent>('order.address:change', this.handleAddressChange.bind(this));
+    this.events.on<EmailChangeEvent>('contacts.email:change', this.handleEmailChange.bind(this));
+    this.events.on<PhoneChangeEvent>('contacts.phone:change', this.handlePhoneChange.bind(this));
+    
+    this.events.on('success:close', this.closeModal.bind(this));
   }
-  orderManager.setEmail(fakeEmail);
-  orderManager.setPhone('');
-  try {
-    orderManager.createRequest(shoppingCart);
-  } catch(error)  {
-    logger.test('Если не указать телефон, то запрос не сформируется?', true);
-    logger.log(error);
-  }
-
-  // Тест 9: Формирование запроса на сервер при пустой корзине
-  try {
-    shoppingCart.clear();
-    orderManager.setPhone(fakeTelephone);
-    orderManager.createRequest(shoppingCart);
-  } catch(error)  {
-    logger.test('Если корзина пуста, то запрос не сформируется?', true);
-    logger.log(error);
-  }
-  logger.groupEnd();
-
-  return { productCollection, shoppingCart, orderManager };
-}
-
-// Тестирование работы api
-async function testAPI() {
-  const api = new Api(API_URL);
-  const appAPI = new AppAPI(api);
-
-  try {
-    const serverProducts = await appAPI.getProductList();
-    const availableProducts = serverProducts.filter(product => product.price !== null && product.price > 0); 
-    if (availableProducts.length === 0) {
-      logger.error('Нет товаров для тестирования сценариев');
-      return;
+  
+  /**
+   * Загрузка товаров с сервера
+   */
+  private async loadProducts(): Promise<void> {
+    try {
+      const products = await this.appApi.getProductList();
+      this.productCollection.setProducts(products);
+    } catch (error) {
+      console.error('Ошибка загрузки товаров:', error);
     }
-    const productCollection = new ProductCollection();
-    productCollection.setProducts(serverProducts);
-    logger.log('Массив товаров с сервера: ', productCollection.getProducts());
+  }
+  
+  /**
+   * Рендер каталога товаров
+   */
+  private renderCatalog(): void {
+    const products = this.productCollection.getProducts();
+    const cards = products.map(product => 
+      createCatalogCard(product, this.events).render()
+    );
+    this.page.catalog = cards;
+  }
+  
+  /**
+   * Открытие модального окна с товаром
+   */
+  private showProductModal(data: { product: Product }): void {
+    const product = data.product;
+    const isInBasket = this.shoppingCart.hasItem(product.id);
+    const card = createPreviewCard(product, this.events);
+    
+    card.inBasket = isInBasket;
+    
+    // Если цена null, блокируем кнопку
+    if (product.price === null) {
+      card.button = { label: 'Недоступно', disabled: true };
+    }
+    
+    this.modal.open(card.render());
+  }
+  
+  /**
+   * Обновление корзины и счетчика
+   */
+  private updateBasket(): void {
+    // Обновляем счетчик в шапке
+    this.header.counter = this.shoppingCart.getItemsCount();
+    
+    // Обновляем корзину в модальном окне (если открыта)
+    const modalContent = (this.modal as any)._content;
+    if (modalContent?.querySelector('.basket')) {
+      this.updateBasketModal();
+    }
+  }
 
-    logger.group('=== Сценарий 1: Заказ с одним товаром ===');
-    const singleProductCart = new ShoppingCart();
-    singleProductCart.addItem(availableProducts[0]);
-    const orderManager = new OrderManager();
-    orderManager.setPayment('card');
-    orderManager.setAddress(fakeAddress);
-    orderManager.setEmail(fakeEmail);
-    orderManager.setPhone(fakeTelephone);
-
-    const singleOrder = orderManager.createRequest(singleProductCart);
-    console.log('Одиночный заказ: ', singleOrder);
-    const singleResponse = await appAPI.submitOrder(singleOrder);
-    logger.test('Одиночный заказ размещён?', singleResponse !== undefined);
-    logger.test('Суммы запроса и ответа совпадают?', singleOrder.total === singleResponse.total);
-    logger.groupEnd();
-
-    // Сценарий 2: Заказ с несколькими одинаковыми товарами (если доступно)
-    logger.group('=== Сценарий 2: Заказ с дублированием товаров ===');
-    const duplicateCart = new ShoppingCart();
-    // Добавляем один товар несколько раз
-    duplicateCart.addItem(availableProducts[0]);
-    duplicateCart.addItem(availableProducts[0]);
-    duplicateCart.addItem(availableProducts[0]);
-        
-    const duplicateOrder = orderManager.createRequest(duplicateCart);
-    console.log(duplicateOrder);
-    const duplicateResponse = await appAPI.submitOrder(duplicateOrder);
-    logger.test('Заказ с дубликатами размещён?', duplicateResponse !== undefined);
-    logger.test('Суммы запроса и ответа совпадают?', duplicateResponse.total === duplicateOrder.total);
-    logger.groupEnd();
-  } catch (error) {
-    logger.error('Ошибка при работе с API:', error);
+  /**
+   * Обновление модального окна корзины
+   */
+  private updateBasketModal(): void {
+    const basketView = createBasketView(this.events);
+    const items = this.shoppingCart.getItems();
+    
+    if (items.length === 0) {
+      basketView.items = [];
+      basketView.total = 0;
+      basketView.button = false;
+    } else {
+      const basketCards = items.map((item, index) => {
+        const card = createBasketCard(item, this.events);
+        card.index = index + 1;
+        return card.render();
+      });
+      
+      basketView.items = basketCards;
+      basketView.total = this.shoppingCart.getTotalPrice();
+      basketView.button = true;
+    }
+    
+    // Обновляем содержимое модального окна
+    (this.modal as any)._content.replaceChildren(basketView.render());
+  }
+  
+  /**
+   * Обработчик выбора карточки
+   */
+  private handleCardSelect(data: CardSelectEvent): void {
+    const product = this.productCollection.getProductById(data.id);
+    if (product) {
+      this.productCollection.setSelectedProduct(product);
+    }
+  }
+  
+  /**
+   * Обработчик добавления товара в корзину
+   */
+  private handleCardAdd(data: CardActionEvent): void {
+    const product = this.productCollection.getProductById(data.id);
+    if (product) {
+      this.shoppingCart.addItem(product);
+      this.modal.close();
+    }
+  }
+  
+  /**
+   * Обработчик удаления товара из корзины (из модального окна товара)
+   */
+  private handleCardRemove(data: CardActionEvent): void {
+    this.shoppingCart.removeItem(data.id);
+    this.modal.close();
+  }
+  
+  /**
+   * Обработчик удаления товара из корзины, но из самой корзины
+   */
+  private handleBasketRemove(data: BasketRemoveEvent): void {
+    this.shoppingCart.removeItem(data.id);
+  }
+  
+  /**
+   * Открытие корзины
+   */
+  private openBasket(): void {
+    const basketView = createBasketView(this.events);
+    const items = this.shoppingCart.getItems();
+    
+    if (items.length === 0) {
+      basketView.items = [];
+      basketView.total = 0;
+      basketView.button = false;
+    } else {
+      const basketCards = items.map((item, index) => {
+        const card = createBasketCard(item, this.events);
+        card.index = index + 1;
+        return card.render();
+      });
+      
+      basketView.items = basketCards;
+      basketView.total = this.shoppingCart.getTotalPrice();
+      basketView.button = true;
+    }
+    
+    this.modal.open(basketView.render());
+  }
+  
+  /**
+   * Открытие формы оформления заказа
+   */
+  private openOrderForm(): void {
+    const orderForm = createOrderForm(this.events);
+    
+    // Восстанавливаем данные из OrderManager
+    const orderData = this.orderManager.getOrderData();
+    if (orderData.payment) {
+      orderForm.payment = orderData.payment;
+    }
+    if (orderData.address) {
+      orderForm.address = orderData.address;
+    }
+    
+    // Проверяем валидность формы
+    this.updateOrderFormValidation();
+    
+    this.modal.open(orderForm.render());
+  }
+  
+  /**
+   * Обработчик отправки формы заказа
+   */
+  private handleOrderSubmit(data: OrderSubmitEvent): void {
+    this.openContactsForm(data);
+  }
+  
+  /**
+   * Открытие формы контактов
+   */
+  private openContactsForm(data?: OrderSubmitEvent): void {
+    if (data) {
+      this.orderManager.setPayment(data.payment as 'card' | 'cash');
+      this.orderManager.setAddress(data.address);
+    }
+    
+    const contactsForm = createContactsForm(this.events);
+    
+    // Восстанавливаем данные из OrderManager
+    const orderData = this.orderManager.getOrderData();
+    if (orderData.email) {
+      contactsForm.email = orderData.email;
+    }
+    if (orderData.phone) {
+      contactsForm.phone = orderData.phone;
+    }
+    
+    // Проверяем валидность формы
+    this.updateContactsFormValidation();
+    
+    this.modal.open(contactsForm.render());
+  }
+  
+  /**
+   * Обработчик отправки формы контактов
+   */
+  private handleContactsSubmit(data: ContactsSubmitEvent): void {
+    this.submitOrder(data);
+  }
+  
+  /**
+   * Обновление данных формы заказа
+   */
+  private updateOrderForm(): void {
+    // Только обновляем валидацию, не переоткрываем форму!!!
+    this.updateOrderFormValidation();
+  }
+  
+  /**
+   * Проверка валидности формы заказа
+   */
+  private updateOrderFormValidation(): void {
+    const errors = this.orderManager.validate();
+    const modalContent = (this.modal as any)._content;
+    const orderForm = modalContent?.querySelector('.form[name="order"]');
+    
+    if (orderForm) {
+      const errorMessages = [];
+      if (errors.payment) errorMessages.push(errors.payment);
+      if (errors.address) errorMessages.push(errors.address);
+      
+      const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
+      
+      const errorElement = orderForm.querySelector('.form__errors');
+      const submitButton = orderForm.querySelector('button[type="submit"]');
+      
+      if (errorElement) {
+        errorElement.textContent = errorText;
+      }
+      
+      if (submitButton) {
+        submitButton.disabled = errorMessages.length > 0;
+      }
+    }
+  }
+  
+  /**
+   * Обновление данных формы контактов
+   */
+  private updateContactsForm(): void {
+    // Только обновляем валидацию, не переоткрываем форму!!!
+    this.updateContactsFormValidation();
+  }
+  
+  /**
+   * Проверка валидности формы контактов
+   */
+  private updateContactsFormValidation(): void {
+    const errors = this.orderManager.validate();
+    const modalContent = (this.modal as any)._content;
+    const contactsForm = modalContent?.querySelector('.form[name="contacts"]');
+    
+    if (contactsForm) {
+      const errorMessages = [];
+      if (errors.email) errorMessages.push(errors.email);
+      if (errors.phone) errorMessages.push(errors.phone);
+      
+      const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
+      
+      const errorElement = contactsForm.querySelector('.form__errors');
+      const submitButton = contactsForm.querySelector('button[type="submit"]');
+      
+      if (errorElement) {
+        errorElement.textContent = errorText;
+      }
+      
+      if (submitButton) {
+        submitButton.disabled = errorMessages.length > 0;
+      }
+    }
+  }
+  
+  /**
+   * Обработчики изменения полей форм
+   */
+  private handlePaymentChange(data: PaymentChangeEvent): void {
+    this.orderManager.setPayment(data.payment as 'card' | 'cash');
+    this.updateOrderFormValidation();
+  }
+  
+  private handleAddressChange(data: AddressChangeEvent): void {
+    this.orderManager.setAddress(data.address);
+    this.updateOrderFormValidation();
+  }
+  
+  private handleEmailChange(data: EmailChangeEvent): void {
+    this.orderManager.setEmail(data.email);
+    this.updateContactsFormValidation();
+  }
+  
+  private handlePhoneChange(data: PhoneChangeEvent): void {
+    this.orderManager.setPhone(data.phone);
+    this.updateContactsFormValidation();
+  }
+  
+  /**
+   * Отправка заказа
+   */
+  private async submitOrder(data?: ContactsSubmitEvent): Promise<void> {
+    if (data) {
+      this.orderManager.setEmail(data.email);
+      this.orderManager.setPhone(data.phone);
+    }
+    
+    try {
+      // Формируем запрос
+      const orderRequest = this.orderManager.createRequest(this.shoppingCart);
+      
+      // Отправляем на сервер
+      const response = await this.appApi.submitOrder(orderRequest);
+      
+      // Показываем сообщение об успехе
+      const successView = createSuccessView(this.events);
+      successView.total = response.total;
+      
+      // Очищаем корзину и данные заказа
+      this.shoppingCart.clear();
+      this.orderManager.clear();
+      
+      this.modal.open(successView.render());
+      
+    } catch (error) {
+      console.error('Ошибка оформления заказа:', error);
+      // Для отображения ошибки
+      const errorMessage = document.createElement('div');
+      errorMessage.textContent = 'Ошибка оформления заказа. Попробуйте еще раз.';
+      errorMessage.classList.add('error-message');
+      
+      const modalContent = (this.modal as any)._content;
+      if (modalContent) {
+        modalContent.appendChild(errorMessage);
+      }
+    }
+  }
+  
+  /**
+   * Закрытие модального окна
+   */
+  private closeModal(): void {
+    this.modal.close();
   }
 }
 
-async function main() {
-  // Сначала тестируем модели с локальными данными
-  testModels();
-  
-  // Затем тестируем работу с API
-  await testAPI();
-}
+// Запуск приложения
+new App();
 
-// Запускаем приложение
-main();
+
+//
+ if (import.meta.env.DEV) {
+   (window as any).runAppTests = runTests;
+ }
+//

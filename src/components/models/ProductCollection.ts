@@ -1,11 +1,13 @@
 import { Product } from '../../types';
+import { EventEmitter } from '../base/Events';
 
-export class ProductCollection {
+export class ProductCollection extends EventEmitter {
   private products: Product[] = [];
   private selectedProduct: Product | null = null;
 
   setProducts(products: Product[]): void {
     this.products = products;
+    this.emit('products:changed', { products: this.products });
   }
 
   getProducts(): Product[] {
@@ -18,6 +20,7 @@ export class ProductCollection {
 
   setSelectedProduct(product: Product): void {
     this.selectedProduct = product;
+    this.emit('product:selected', { product: this.selectedProduct });
   }
 
   getSelectedProduct(): Product | null {

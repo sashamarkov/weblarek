@@ -1,7 +1,8 @@
 import { OrderData, OrderRequest, ValidationResult } from '../../types';
 import { ShoppingCart } from './ShoppingCart';
+import { EventEmitter } from '../base/Events';
 
-export class OrderManager {
+export class OrderManager extends EventEmitter {
   private orderData: OrderData = {
     payment: '',
     email: '',
@@ -9,7 +10,7 @@ export class OrderManager {
     address: ''
   };
 
-  createRequest(cart:ShoppingCart): OrderRequest {
+  createRequest(cart: ShoppingCart): OrderRequest {
     const errors = this.validate();
     if (Object.keys(errors).length > 0) {
       throw new Error('Не все данные заполнены: ' + Object.values(errors).join(', '));
@@ -32,18 +33,22 @@ export class OrderManager {
 
   setPayment(payment: 'card' | 'cash'): void {
     this.orderData.payment = payment;
+    this.emit('order:changed', { order: this.orderData });
   }
 
   setAddress(address: string): void {
     this.orderData.address = address;
+    this.emit('order:changed', { order: this.orderData });
   }
 
   setEmail(email: string): void {
     this.orderData.email = email;
+    this.emit('order:changed', { order: this.orderData });
   }
 
   setPhone(phone: string): void {
     this.orderData.phone = phone;
+    this.emit('order:changed', { order: this.orderData });
   }
 
   getOrderData(): OrderData {
@@ -57,6 +62,7 @@ export class OrderManager {
       phone: '',
       address: ''
     };
+    this.emit('order:changed', { order: this.orderData });
   }
 
   validate(): ValidationResult {

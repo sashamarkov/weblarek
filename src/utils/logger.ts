@@ -1,6 +1,6 @@
-// Вспомогательный класс для журналирования и проверки работы сервера
+// Вспомогательный класс для журналирования (с поддержской цветов для удобства просмотра в консоли)
 class Logger {
-  private isEnabled: boolean = import.meta.env.MODE === 'development';
+  private isEnabled: boolean = import.meta.env.DEV;
 
   private readonly COLORS = {
     GREEN: '\x1b[32m',

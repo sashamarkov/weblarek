@@ -16,7 +16,29 @@ export const categoryMap = {
   'другое': 'card__category_other',
 };
 
-export const settings = {
+export const settings = { };
 
-};
+// Дополнительные константы для приложения
+export const APP_EVENTS = {
+  // События моделей
+  PRODUCTS_CHANGED: 'products:changed',
+  PRODUCT_SELECTED: 'product:selected',
+  BASKET_CHANGED: 'basket:changed',
+  ORDER_CHANGED: 'order:changed',
+  
+  // События представлений
+  CARD_SELECT: 'card:select',
+  CARD_ADD: 'card:add',
+  CARD_REMOVE: 'card:remove',
+  BASKET_REMOVE: 'basket:remove',
+  HEADER_BASKET: 'header:basket',
+  BASKET_ORDER: 'basket:order',
+  ORDER_SUBMIT: 'order:submit',
+  CONTACTS_SUBMIT: 'contacts:submit',
+  ORDER_PAYMENT_CHANGE: 'order.payment:change',
+  ORDER_ADDRESS_CHANGE: 'order.address:change',
+  CONTACTS_EMAIL_CHANGE: 'contacts.email:change',
+  CONTACTS_PHONE_CHANGE: 'contacts.phone:change',
+  SUCCESS_CLOSE: 'success:close',
+} as const;
 
