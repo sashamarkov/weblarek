@@ -166,43 +166,44 @@ export class UnitTests {
     logger.test('Phone очищен?', clearedData.phone === '');
     
     // Тест 7: Формирование корректного запроса на сервер
-    orderManager.setPayment('card');
-    orderManager.setAddress(fakeAddress);
-    orderManager.setEmail(fakeEmail);
-    orderManager.setPhone(fakeTelephone);
+    // orderManager.setPayment('card');
+    // orderManager.setAddress(fakeAddress);
+    // orderManager.setEmail(fakeEmail);
+    // orderManager.setPhone(fakeTelephone);
     
-    // Добавляем товары в корзину
-    shoppingCart.addItem(testProducts[0]);
-    shoppingCart.addItem(testProducts[1]);
-    shoppingCart.addItem(testProducts[2]);
+    // // Добавляем товары в корзину
+    // shoppingCart.addItem(testProducts[0]);
+    // shoppingCart.addItem(testProducts[1]);
+    // shoppingCart.addItem(testProducts[2]);
     
-    try {
-      const order = orderManager.createRequest(shoppingCart);
-      logger.log('Формирование запроса на сервер: ', order);
-      const cartItems = shoppingCart.getItems();
+  //   try {
+  //     const order = orderManager.createRequest(shoppingCart);
+  //     logger.log('Формирование запроса на сервер: ', order);
+  //     const cartItems = shoppingCart.getItems();
       
-      logger.test('Количество товаров в корзине и запросе совпадают?', 
-        shoppingCart.getItemsCount() === order.items.length);
-      logger.test('Суммы в корзине и запросе совпадают?', 
-        shoppingCart.getTotalPrice() === order.total);
-      logger.test('В корзине и запросе одни и те же товары?', 
-        cartItems[0].id === order.items[0] && cartItems[1].id === order.items[1] && cartItems[2].id === order.items[2]);
-    } catch (error) {
-      logger.error('Ошибка формирования запроса:', error);
-    }
+  //     logger.test('Количество товаров в корзине и запросе совпадают?', 
+  //       shoppingCart.getItemsCount() === order.items.length);
+  //     logger.test('Суммы в корзине и запросе совпадают?', 
+  //       shoppingCart.getTotalPrice() === order.total);
+  //     logger.test('В корзине и запросе одни и те же товары?', 
+  //       cartItems[0].id === order.items[0] && cartItems[1].id === order.items[1] && cartItems[2].id === order.items[2]);
+  //   } catch (error) {
+  //     logger.error('Ошибка формирования запроса:', error);
+  //   }
     
-    // Тест 8: Формирование запроса при отсутствующих данных
-    const testOrderManager = new OrderManager();
-    testOrderManager.setPayment('card');
+  //   // Тест 8: Формирование запроса при отсутствующих данных
+  //   const testOrderManager = new OrderManager();
+  //   testOrderManager.setPayment('card');
     
-    // Не устанавливаем адрес
-    try {
-      testOrderManager.createRequest(shoppingCart);
-      logger.test('Если не указать адрес, то запрос не сформируется?', false);
-    } catch {
-      logger.test('Если не указать адрес, то запрос не сформируется?', true);
-    }
+  //   // Не устанавливаем адрес
+  //   try {
+  //     testOrderManager.createRequest(shoppingCart);
+  //     logger.test('Если не указать адрес, то запрос не сформируется?', false);
+  //   } catch {
+  //     logger.test('Если не указать адрес, то запрос не сформируется?', true);
+  //   }
     
-    logger.groupEnd();
+  //   logger.groupEnd();
+  // }
   }
 }

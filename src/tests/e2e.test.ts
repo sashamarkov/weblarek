@@ -2,7 +2,7 @@ import { logger } from '../utils/logger';
 import { ensureElement } from '../utils/utils';
 
 /**
- * E2E сквозные тесты интерфейса приложения
+ * E2E сквозные тесты интерфейса приложения (В РАЗРАБОТКЕ)
  */
 export class E2ETester {
   private gallery: HTMLElement;
