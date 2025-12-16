@@ -1,3 +1,4 @@
+//#region Импорты
 import './scss/styles.scss';
 
 import { EventEmitter } from './components/base/Events';
@@ -13,20 +14,18 @@ import {
   Page, 
   Header, 
   Modal, 
-  createCatalogCard,
-  createPreviewCard,
-  createBasketCard,
-  createBasketView,
-  createOrderForm,
-  createContactsForm,
-  createSuccessView
+  PreviewCard,
+  BasketView,
+  OrderForm,
+  ContactsForm,
+  SuccessView,
+  CatalogCard, 
+  BasketCard,
 } from './components/view';
 
-import { Product } from './types';
-import { ensureElement } from './utils/utils';
-
-import { runTests } from './tests';
-
+import { Product, OrderRequest, ValidationErrors} from './types';
+import { ensureElement, cloneTemplate } from './utils/utils';
+//#endregion
 
 // Типы для событий
 type CardSelectEvent = { id: string };
@@ -38,6 +37,151 @@ type EmailChangeEvent = { email: string };
 type PhoneChangeEvent = { phone: string };
 type OrderSubmitEvent = { payment: string, address: string };
 type ContactsSubmitEvent = { email: string, phone: string };
+
+/**
+ * Фабрика для создания представлений
+*/
+class ViewFactory {
+  private previewCardInstance: PreviewCard | null = null;
+  private basketViewInstance: BasketView | null = null;
+  private orderFormInstance: OrderForm | null = null;
+  private contactsFormInstance: ContactsForm | null = null;
+  private successViewInstance: SuccessView | null = null;
+  private pageInstance: Page | null = null;
+  private headerInstance: Header | null = null;
+  private modalInstance: Modal | null = null;
+
+  constructor(private events: EventEmitter) {}
+
+  /**
+   * Создаёт или возвращает существующий экземпляр PreviewCard
+   */
+  getPreviewCard(): PreviewCard {
+    if (!this.previewCardInstance) {
+      const template = cloneTemplate<HTMLElement>('#card-preview');
+      this.previewCardInstance = new PreviewCard(template, this.events);
+    }
+    return this.previewCardInstance;
+  }
+
+  /**
+   * Создаёт или возвращает существующий экземпляр BasketView
+   */
+  getBasketView(): BasketView {
+    if (!this.basketViewInstance) {
+      const template = cloneTemplate<HTMLElement>('#basket');
+      this.basketViewInstance = new BasketView(template, this.events);
+    }
+    return this.basketViewInstance;
+  }
+
+  /**
+   * Создаёт или возвращает существующий экземпляр OrderForm
+   */
+  getOrderForm(): OrderForm {
+    if (!this.orderFormInstance) {
+      const template = cloneTemplate<HTMLElement>('#order');
+      this.orderFormInstance = new OrderForm(template, this.events);
+    }
+    return this.orderFormInstance;
+  }
+
+  /**
+   * Создаёт или возвращает существующий экземпляр ContactsForm
+   */
+  getContactsForm(): ContactsForm {
+    if (!this.contactsFormInstance) {
+      const template = cloneTemplate<HTMLElement>('#contacts');
+      this.contactsFormInstance = new ContactsForm(template, this.events);
+    }
+    return this.contactsFormInstance;
+  }
+
+  /**
+  * Создаёт или возвращает существующий экземпляр SuccessView
+  */
+  getSuccessView(): SuccessView {
+    if (!this.successViewInstance) {
+      const template = cloneTemplate<HTMLElement>('#success');
+      this.successViewInstance = new SuccessView(template, this.events);
+    }
+    return this.successViewInstance;
+  }
+
+  /**
+  * Создаёт или возвращает существующий экземпляр Page
+  */
+  getPage(): Page {
+    if(!this.pageInstance) {
+      this.pageInstance = new Page(ensureElement<HTMLElement>('.page__wrapper'));
+    }
+    return this.pageInstance;
+  }
+
+  /**
+  * Создаёт или возвращает существующий экземпляр Header
+  */
+  getHeader(): Header {
+    if(!this.headerInstance) {
+      this.headerInstance = new Header(ensureElement<HTMLElement>('.header'), events);
+    }
+    return this.headerInstance;
+  }
+
+  /**
+  * Создаёт или возвращает существующий экземпляр Modal
+  */
+  getModal() : Modal {
+    if(!this.modalInstance) {
+      this.modalInstance = new Modal(ensureElement<HTMLElement>('#modal-container'));
+    }
+    return this.modalInstance;
+  }
+
+  /**
+  * Создаёт экземпляр CatalogCard
+  */
+  getCatalogCard(product: Product): CatalogCard {
+      const template = cloneTemplate<HTMLElement>('#card-catalog');
+      const card = new CatalogCard(template, this.events);
+      
+      card.id = product.id;
+      card.title = product.title;
+      card.image = product.image;
+      card.price = product.price;
+      card.category = product.category;
+      
+      return card;
+  }
+
+  /**
+  * Создаёт экземпляр BasketCard
+  */
+  public getBasketCard(product: Product): BasketCard {
+      const template = cloneTemplate<HTMLElement>('#card-basket');
+      const card = new BasketCard(template, this.events);
+      
+      card.id = product.id;
+      card.title = product.title;
+      card.price = product.price;
+      
+      return card;
+  }
+
+  /**
+   * Сбрасывает все экземпляры представлений (для тестирования)
+   */
+  protected reset(): void {
+    this.previewCardInstance = null;
+    this.basketViewInstance = null;
+    this.orderFormInstance = null;
+    this.contactsFormInstance = null;
+    this.successViewInstance = null;
+    this.modalInstance = null;
+    this.headerInstance = null;
+    this.pageInstance = null;
+  }
+}
 
 // Инициализация приложения
 class App {
@@ -53,29 +197,53 @@ class App {
   private header: Header;
   private modal: Modal;
   
-  constructor() {
-    // 1. Инициализация событий и API
-    this.events = new EventEmitter();
-    this.api = new Api(API_URL);
-    this.appApi = new AppAPI(this.api);
+  // Экземпляры представлений
+  private previewCard: PreviewCard;
+  private basketView: BasketView;
+  private orderForm: OrderForm;
+  private contactsForm: ContactsForm;
+  private successView: SuccessView;
+
+  private viewFactory: ViewFactory;
+  
+  private currentForm: 'order' | 'contacts' | 'basket' | 'product' | null = null;
+
+  constructor(
+    events: EventEmitter,
+    api: Api,
+    appApi: AppAPI,
+    productCollection: ProductCollection,
+    shoppingCart: ShoppingCart,
+    orderManager: OrderManager,
+    viewFactory: ViewFactory
+  ) {
+    this.events = events;
+    this.api = api;
+    this.appApi = appApi;
+    this.productCollection = productCollection;
+    this.shoppingCart = shoppingCart;
+    this.orderManager = orderManager;
     
-    // 2. Инициализация моделей
-    this.productCollection = new ProductCollection();
-    this.shoppingCart = new ShoppingCart();
-    this.orderManager = new OrderManager();
+    // Создаём экземпляры представлений один раз в конструктуре
+    // Плюс фабрика это гарантирует
+    this.page = viewFactory.getPage();
+    this.header = viewFactory.getHeader();
+    this.modal = viewFactory.getModal();
+    this.previewCard = viewFactory.getPreviewCard();
+    this.basketView = viewFactory.getBasketView();
+    this.orderForm = viewFactory.getOrderForm();
+    this.contactsForm = viewFactory.getContactsForm();
+    this.successView = viewFactory.getSuccessView();
     
-    // 3. Инициализация представлений
-    this.page = new Page(ensureElement<HTMLElement>('.page__wrapper'));
-    this.header = new Header(ensureElement<HTMLElement>('.header'), this.events);
-    this.modal = new Modal(ensureElement<HTMLElement>('#modal-container'));
-    
-    // 4. Настройка обработчиков событий
+    this.viewFactory = viewFactory;
+
+    // Настройка обработчиков событий
     this.setupEventListeners();
     
-    // 5. Загрузка товаров с сервера
+    // Загрузка товаров с сервера
     this.loadProducts();
   }
-  
+
   /**
    * Настройка всех обработчиков событий
    */
@@ -84,7 +252,7 @@ class App {
     this.productCollection.on('products:changed', this.renderCatalog.bind(this));
     this.productCollection.on('product:selected', this.showProductModal.bind(this));
     this.shoppingCart.on('basket:changed', this.updateBasket.bind(this));
-    this.orderManager.on('order:changed', this.updateOrderForm.bind(this));
+    this.orderManager.on('order:changed', this.updateForms.bind(this));
     
     // События от представлений с явной типизацией
     this.events.on<CardSelectEvent>('card:select', this.handleCardSelect.bind(this));
@@ -124,7 +292,7 @@ class App {
   private renderCatalog(): void {
     const products = this.productCollection.getProducts();
     const cards = products.map(product => 
-      createCatalogCard(product, this.events).render()
+      this.viewFactory.getCatalogCard(product).render()
     );
     this.page.catalog = cards;
   }
@@ -135,16 +303,28 @@ class App {
   private showProductModal(data: { product: Product }): void {
     const product = data.product;
     const isInBasket = this.shoppingCart.hasItem(product.id);
-    const card = createPreviewCard(product, this.events);
     
-    card.inBasket = isInBasket;
+    // Обновляем данные карточки
+    this.previewCard.id = product.id; // Устанавливаем id здесь
+    this.previewCard.title = product.title;
+    this.previewCard.image = product.image;
+    this.previewCard.price = product.price;
+    this.previewCard.category = product.category;
+    this.previewCard.description = product.description;
+    this.previewCard.inBasket = isInBasket;
     
     // Если цена null, блокируем кнопку
     if (product.price === null) {
-      card.button = { label: 'Недоступно', disabled: true };
+        this.previewCard.button = { label: 'Недоступно', disabled: true };
+    } else {
+        this.previewCard.button = { 
+            label: isInBasket ? 'Удалить из корзины' : 'В корзину', 
+            disabled: false 
+        };
     }
     
-    this.modal.open(card.render());
+    this.currentForm = 'product';
+    this.modal.open(this.previewCard.render());
   }
   
   /**
@@ -154,38 +334,33 @@ class App {
     // Обновляем счетчик в шапке
     this.header.counter = this.shoppingCart.getItemsCount();
     
-    // Обновляем корзину в модальном окне (если открыта)
-    const modalContent = (this.modal as any)._content;
-    if (modalContent?.querySelector('.basket')) {
-      this.updateBasketModal();
+    // Обновляем корзину (если она открыта)
+    if (this.currentForm === 'basket') {
+      this.updateBasketContent();
     }
   }
-
+  
   /**
-   * Обновление модального окна корзины
+   * Обновление содержимого корзины
    */
-  private updateBasketModal(): void {
-    const basketView = createBasketView(this.events);
+  private updateBasketContent(): void {
     const items = this.shoppingCart.getItems();
     
     if (items.length === 0) {
-      basketView.items = [];
-      basketView.total = 0;
-      basketView.button = false;
+      this.basketView.items = [];
+      this.basketView.total = 0;
+      this.basketView.button = false;
     } else {
       const basketCards = items.map((item, index) => {
-        const card = createBasketCard(item, this.events);
+        const card = viewFactory.getBasketCard(item);
         card.index = index + 1;
         return card.render();
       });
       
-      basketView.items = basketCards;
-      basketView.total = this.shoppingCart.getTotalPrice();
-      basketView.button = true;
+      this.basketView.items = basketCards;
+      this.basketView.total = this.shoppingCart.getTotalPrice();
+      this.basketView.button = true;
     }
-    
-    // Обновляем содержимое модального окна
-    (this.modal as any)._content.replaceChildren(basketView.render());
   }
   
   /**
@@ -206,6 +381,7 @@ class App {
     if (product) {
       this.shoppingCart.addItem(product);
       this.modal.close();
+      this.currentForm = null;
     }
   }
   
@@ -215,6 +391,7 @@ class App {
   private handleCardRemove(data: CardActionEvent): void {
     this.shoppingCart.removeItem(data.id);
     this.modal.close();
+    this.currentForm = null;
   }
   
   /**
@@ -228,95 +405,78 @@ class App {
    * Открытие корзины
    */
   private openBasket(): void {
-    const basketView = createBasketView(this.events);
-    const items = this.shoppingCart.getItems();
-    
-    if (items.length === 0) {
-      basketView.items = [];
-      basketView.total = 0;
-      basketView.button = false;
-    } else {
-      const basketCards = items.map((item, index) => {
-        const card = createBasketCard(item, this.events);
-        card.index = index + 1;
-        return card.render();
-      });
-      
-      basketView.items = basketCards;
-      basketView.total = this.shoppingCart.getTotalPrice();
-      basketView.button = true;
-    }
-    
-    this.modal.open(basketView.render());
+    this.updateBasketContent();
+    this.currentForm = 'basket';
+    this.modal.open(this.basketView.render());
   }
   
   /**
    * Открытие формы оформления заказа
    */
   private openOrderForm(): void {
-    const orderForm = createOrderForm(this.events);
-    
     // Восстанавливаем данные из OrderManager
     const orderData = this.orderManager.getOrderData();
     if (orderData.payment) {
-      orderForm.payment = orderData.payment;
+      this.orderForm.payment = orderData.payment;
     }
     if (orderData.address) {
-      orderForm.address = orderData.address;
+      this.orderForm.address = orderData.address;
     }
     
-    // Проверяем валидность формы
+    // Обновляем валидацию
     this.updateOrderFormValidation();
     
-    this.modal.open(orderForm.render());
+    this.currentForm = 'order';
+    this.modal.open(this.orderForm.render());
   }
   
   /**
    * Обработчик отправки формы заказа
    */
   private handleOrderSubmit(data: OrderSubmitEvent): void {
-    this.openContactsForm(data);
+    this.orderManager.setPayment(data.payment as 'card' | 'cash');
+    this.orderManager.setAddress(data.address);
+    this.openContactsForm();
   }
   
   /**
    * Открытие формы контактов
    */
-  private openContactsForm(data?: OrderSubmitEvent): void {
-    if (data) {
-      this.orderManager.setPayment(data.payment as 'card' | 'cash');
-      this.orderManager.setAddress(data.address);
-    }
-    
-    const contactsForm = createContactsForm(this.events);
-    
+  private openContactsForm(): void {
     // Восстанавливаем данные из OrderManager
     const orderData = this.orderManager.getOrderData();
     if (orderData.email) {
-      contactsForm.email = orderData.email;
+      this.contactsForm.email = orderData.email;
     }
     if (orderData.phone) {
-      contactsForm.phone = orderData.phone;
+      this.contactsForm.phone = orderData.phone;
     }
     
-    // Проверяем валидность формы
+    // Обновляем валидацию
     this.updateContactsFormValidation();
     
-    this.modal.open(contactsForm.render());
+    this.currentForm = 'contacts';
+    this.modal.open(this.contactsForm.render());
   }
   
   /**
    * Обработчик отправки формы контактов
    */
   private handleContactsSubmit(data: ContactsSubmitEvent): void {
-    this.submitOrder(data);
+    this.orderManager.setEmail(data.email);
+    this.orderManager.setPhone(data.phone);
+    this.submitOrder();
   }
   
   /**
-   * Обновление данных формы заказа
+   * Обновление валидации форм
    */
-  private updateOrderForm(): void {
-    // Только обновляем валидацию, не переоткрываем форму!!!
-    this.updateOrderFormValidation();
+  private updateForms(): void {
+    if (this.currentForm === 'order') {
+      this.updateOrderFormValidation();
+    } else if (this.currentForm === 'contacts') {
+      this.updateContactsFormValidation();
+    }
   }
   
   /**
@@ -324,35 +484,17 @@ class App {
    */
   private updateOrderFormValidation(): void {
     const errors = this.orderManager.validate();
-    const modalContent = (this.modal as any)._content;
-    const orderForm = modalContent?.querySelector('.form[name="order"]');
     
-    if (orderForm) {
-      const errorMessages = [];
-      if (errors.payment) errorMessages.push(errors.payment);
-      if (errors.address) errorMessages.push(errors.address);
-      
-      const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
-      
-      const errorElement = orderForm.querySelector('.form__errors');
-      const submitButton = orderForm.querySelector('button[type="submit"]');
-      
-      if (errorElement) {
-        errorElement.textContent = errorText;
-      }
-      
-      if (submitButton) {
-        submitButton.disabled = errorMessages.length > 0;
-      }
-    }
-  }
-  
-  /**
-   * Обновление данных формы контактов
-   */
-  private updateContactsForm(): void {
-    // Только обновляем валидацию, не переоткрываем форму!!!
-    this.updateContactsFormValidation();
+    const errorMessages = [];
+    if (errors.payment) errorMessages.push(errors.payment);
+    if (errors.address) errorMessages.push(errors.address);
+    
+    const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
+    const isValid = errorMessages.length === 0;
+    
+    // Передаём ошибки и состояние валидности в представление
+    this.orderForm.errors = errorText;
+    this.orderForm.valid = isValid;
   }
   
   /**
@@ -360,89 +502,89 @@ class App {
    */
   private updateContactsFormValidation(): void {
     const errors = this.orderManager.validate();
-    const modalContent = (this.modal as any)._content;
-    const contactsForm = modalContent?.querySelector('.form[name="contacts"]');
     
-    if (contactsForm) {
-      const errorMessages = [];
-      if (errors.email) errorMessages.push(errors.email);
-      if (errors.phone) errorMessages.push(errors.phone);
-      
-      const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
-      
-      const errorElement = contactsForm.querySelector('.form__errors');
-      const submitButton = contactsForm.querySelector('button[type="submit"]');
-      
-      if (errorElement) {
-        errorElement.textContent = errorText;
-      }
-      
-      if (submitButton) {
-        submitButton.disabled = errorMessages.length > 0;
-      }
-    }
+    const errorMessages = [];
+    if (errors.email) errorMessages.push(errors.email);
+    if (errors.phone) errorMessages.push(errors.phone);
+    
+    const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
+    const isValid = errorMessages.length === 0;
+    
+    // Передаём ошибки и состояние валидности в представление
+    this.contactsForm.errors = errorText;
+    this.contactsForm.valid = isValid;
   }
   
-  /**
-   * Обработчики изменения полей форм
-   */
+  //#region Обработчики изменения полей форм
   private handlePaymentChange(data: PaymentChangeEvent): void {
     this.orderManager.setPayment(data.payment as 'card' | 'cash');
-    this.updateOrderFormValidation();
   }
   
   private handleAddressChange(data: AddressChangeEvent): void {
     this.orderManager.setAddress(data.address);
-    this.updateOrderFormValidation();
   }
   
   private handleEmailChange(data: EmailChangeEvent): void {
     this.orderManager.setEmail(data.email);
-    this.updateContactsFormValidation();
   }
   
   private handlePhoneChange(data: PhoneChangeEvent): void {
     this.orderManager.setPhone(data.phone);
-    this.updateContactsFormValidation();
   }
+  //#endregion 
   
   /**
    * Отправка заказа
    */
-  private async submitOrder(data?: ContactsSubmitEvent): Promise<void> {
-    if (data) {
-      this.orderManager.setEmail(data.email);
-      this.orderManager.setPhone(data.phone);
-    }
-    
+  private async submitOrder(): Promise<void> {
     try {
-      // Формируем запрос
-      const orderRequest = this.orderManager.createRequest(this.shoppingCart);
+      const errors = this.orderManager.validate();
+      if (Object.keys(errors).length > 0) {
+        throw new Error('Не все данные заполнены: ' + Object.values(errors).join(', '));
+      }
       
-      // Отправляем на сервер
+      // Проверяем, что корзина не пуста
+      if (this.shoppingCart.getItemsCount() === 0) {
+        throw new Error('Корзина пуста');
+      }
+      
+      // Формируем запрос в presenter (не в модели!)
+      const orderData = this.orderManager.getOrderData();
+      const orderRequest: OrderRequest = {
+        payment: orderData.payment as 'card' | 'cash',
+        email: orderData.email,
+        phone: orderData.phone,
+        address: orderData.address,
+        total: this.shoppingCart.getTotalPrice(),
+        items: this.shoppingCart.getItems().map(item => item.id)
+      };
+      
+      // Отправляем на сервер...
       const response = await this.appApi.submitOrder(orderRequest);
       
       // Показываем сообщение об успехе
-      const successView = createSuccessView(this.events);
-      successView.total = response.total;
+      this.successView.total = response.total;
       
       // Очищаем корзину и данные заказа
       this.shoppingCart.clear();
       this.orderManager.clear();
       
-      this.modal.open(successView.render());
+      // Очищаем формы (в случае повторных заказов формы будут пустые)
+      this.orderForm.clear();
+      this.contactsForm.clear();
+      
+      this.currentForm = null;
+      this.modal.open(this.successView.render());
       
     } catch (error) {
       console.error('Ошибка оформления заказа:', error);
-      // Для отображения ошибки
-      const errorMessage = document.createElement('div');
-      errorMessage.textContent = 'Ошибка оформления заказа. Попробуйте еще раз.';
-      errorMessage.classList.add('error-message');
       
-      const modalContent = (this.modal as any)._content;
-      if (modalContent) {
-        modalContent.appendChild(errorMessage);
-      }
+      // Отображаем ошибку через представление
+      const errorElement = document.createElement('div');
+      errorElement.textContent = error instanceof Error ? error.message : 'Ошибка оформления заказа. Попробуйте еще раз.';
+      errorElement.classList.add('error-message');
+      
+      this.modal.content.appendChild(errorElement);
     }
   }
   
@@ -451,15 +593,28 @@ class App {
    */
   private closeModal(): void {
     this.modal.close();
+    this.currentForm = null;
   }
 }
 
+//#region Создание экземпляров снаружи (как рекомендовал ревьюер)
+// Думаю, потом доделаю этот колхоз нормально отдельный классом и с инверсией зависимостей
+const events = new EventEmitter();
+const api = new Api(API_URL);
+const appApi = new AppAPI(api);
+const productCollection = new ProductCollection();
+const shoppingCart = new ShoppingCart();
+const orderManager = new OrderManager();
+const viewFactory = new ViewFactory(events);
+//#endregion
+
 // Запуск приложения
-new App();
-
-
-//
- if (import.meta.env.DEV) {
-   (window as any).runAppTests = runTests;
- }
-//
+new App(
+  events,
+  api,
+  appApi,
+  productCollection,
+  shoppingCart,
+  orderManager,
+  viewFactory
+);

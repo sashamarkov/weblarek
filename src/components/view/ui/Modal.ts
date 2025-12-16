@@ -26,7 +26,7 @@ export class Modal {
         }
         
         this._container.classList.add('modal_active');
-        document.body.style.overflow = 'hidden'; // Блокируем скролл!!!
+        document.body.style.overflow = 'hidden';
     }
 
     /**
@@ -35,7 +35,14 @@ export class Modal {
     close(): void {
         this._container.classList.remove('modal_active');
         this._content.innerHTML = '';
-        document.body.style.overflow = ''; // Восстанавливаем скролл!!!
+        document.body.style.overflow = '';
+    }
+
+    /**
+     * Возвращает содержимое модального окна
+     */
+    get content(): HTMLElement {
+        return this._content;
     }
 
     /**

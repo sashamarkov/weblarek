@@ -39,17 +39,3 @@ export class BasketCard extends Card<Product> {
         return this.container;
     }
 }
-
-/**
- * Фабрика для создания карточек корзины
- */
-export function createBasketCard(product: Product, events: IEvents): BasketCard {
-    const template = cloneTemplate<HTMLElement>('#card-basket');
-    const card = new BasketCard(template, events);
-    
-    card.id = product.id;
-    card.title = product.title;
-    card.price = product.price;
-    
-    return card;
-}

@@ -39,19 +39,3 @@ export class CatalogCard extends Card<Product> {
         return this.container;
     }
 }
-
-/**
- * Метод-фабрика для создания карточек каталога
- */
-export function createCatalogCard(product: Product, events: IEvents): CatalogCard {
-    const template = cloneTemplate<HTMLElement>('#card-catalog');
-    const card = new CatalogCard(template, events);
-    
-    card.id = product.id;
-    card.title = product.title;
-    card.image = product.image;
-    card.price = product.price;
-    card.category = product.category;
-    
-    return card;
-}

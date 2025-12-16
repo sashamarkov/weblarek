@@ -21,13 +21,7 @@ export interface OrderData {
   address: string;
 }
 
-export interface ValidationResult {
-  payment?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-}
-
+// Отдельный интерфейс для самого заказа
 export interface OrderRequest {
   payment: 'card' | 'cash';
   email: string;
@@ -35,6 +29,14 @@ export interface OrderRequest {
   address: string;
   total: number;
   items: string[];
+}
+
+// Отдельный интерфейс для ошибок валидации - только сообщения об ошибках
+export interface ValidationErrors {
+  payment?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
 }
 
 export interface ProductListResponse {

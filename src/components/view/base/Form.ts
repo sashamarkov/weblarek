@@ -13,7 +13,6 @@ export abstract class Form<T> extends Component<T> {
         super(container);
         this._events = events!;
         
-        // Находим кнопку отправки и элемент для ошибок с явным приведением типов
         this._submitButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
         this._errors = container.querySelector('.form__errors') as HTMLElement;
         
@@ -56,13 +55,6 @@ export abstract class Form<T> extends Component<T> {
             input.value = '';
         });
         this.errors = '';
-    }
-
-    /**
-     * Находит поле ввода по имени
-     */
-    protected findInput(name: string): HTMLInputElement | null {
-        return this.container.querySelector(`input[name="${name}"]`) as HTMLInputElement;
     }
 
     /**

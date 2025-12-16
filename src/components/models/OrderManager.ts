@@ -1,5 +1,4 @@
-import { OrderData, OrderRequest, ValidationResult } from '../../types';
-import { ShoppingCart } from './ShoppingCart';
+import { OrderData, ValidationErrors } from '../../types';
 import { EventEmitter } from '../base/Events';
 
 export class OrderManager extends EventEmitter {
@@ -10,45 +9,24 @@ export class OrderManager extends EventEmitter {
     address: ''
   };
 
-  createRequest(cart: ShoppingCart): OrderRequest {
-    const errors = this.validate();
-    if (Object.keys(errors).length > 0) {
-      throw new Error('Не все данные заполнены: ' + Object.values(errors).join(', '));
-    }
-
-    // Проверяем, что корзина не пуста
-    if (cart.getItemsCount() === 0) {
-      throw new Error('Корзина пуста');
-    }
-    const payment = this.orderData.payment as 'card' | 'cash';
-    return {
-      payment: payment,
-      email: this.orderData.email,
-      phone: this.orderData.phone,
-      address: this.orderData.address,
-      total: cart.getTotalPrice(),
-      items: cart.getItems().map(item => item.id)
-    };
-  }
-
   setPayment(payment: 'card' | 'cash'): void {
     this.orderData.payment = payment;
-    this.emit('order:changed', { order: this.orderData });
+    this.emit('order:changed');
   }
 
   setAddress(address: string): void {
     this.orderData.address = address;
-    this.emit('order:changed', { order: this.orderData });
+    this.emit('order:changed');
   }
 
   setEmail(email: string): void {
     this.orderData.email = email;
-    this.emit('order:changed', { order: this.orderData });
+    this.emit('order:changed');
   }
 
   setPhone(phone: string): void {
     this.orderData.phone = phone;
-    this.emit('order:changed', { order: this.orderData });
+    this.emit('order:changed');
   }
 
   getOrderData(): OrderData {
@@ -62,11 +40,11 @@ export class OrderManager extends EventEmitter {
       phone: '',
       address: ''
     };
-    this.emit('order:changed', { order: this.orderData });
+    this.emit('order:changed');
   }
 
-  validate(): ValidationResult {
-    const errors: ValidationResult = {};
+  validate(): ValidationErrors {
+    const errors: ValidationErrors = {};
 
     if (!this.orderData.payment) {
       errors.payment = 'Не выбран способ оплаты';

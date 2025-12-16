@@ -31,6 +31,18 @@ export class OrderForm extends Form<{ payment: string, address: string }> {
     }
 
     /**
+    * Полностью стирает все данные из формы, включая выделение с кнопки оплаты
+    */
+    clear(): void {
+        super.clear(); // очистка инпутов
+        // Снимаем выделение со всех кнопок оплаты
+        this._paymentButtons.forEach(button => {
+            button.classList.remove('button_alt-active');
+        });
+    }
+
+
+    /**
      * Выбирает способ оплаты
      */
     private selectPayment(method: 'card' | 'cash') {
