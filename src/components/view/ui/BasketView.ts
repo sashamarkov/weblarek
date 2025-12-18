@@ -1,6 +1,6 @@
 import { Component } from '../../base/Component';
 import { IEvents } from '../../base/Events';
-import { cloneTemplate, ensureElement } from '../../../utils/utils';
+import { ensureElement } from '../../../utils/utils';
 
 /**
  * Отображение корзины
@@ -48,7 +48,7 @@ export class BasketView extends Component<{ items: HTMLElement[], total: number 
     /**
      * Блокирует или разблокирует кнопку оформления
      */
-    set button(state: boolean) {
+    set buttonEnabled(state: boolean) {
         this._button.disabled = !state;
     }
 
@@ -60,12 +60,4 @@ export class BasketView extends Component<{ items: HTMLElement[], total: number 
             element.textContent = value;
         }
     }
-}
-
-/**
- * Фабрика для создания корзины
- */
-export function createBasketView(events: IEvents): BasketView {
-    const template = cloneTemplate<HTMLElement>('#basket');
-    return new BasketView(template, events);
 }

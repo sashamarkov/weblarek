@@ -1,6 +1,5 @@
 import { Form } from '../base/Form';
 import { IEvents } from '../../base/Events';
-import { cloneTemplate } from '../../../utils/utils';
 
 /**
  * Форма ввода контактных данных
@@ -16,6 +15,13 @@ export class ContactsForm extends Form<{ email: string, phone: string }> {
     }
 
     /**
+     * Возвращает текущее значение email
+     */
+    get email(): string {
+        return this._emailInput.value;
+    }
+
+    /**
      * Устанавливает email
      */
     set email(value: string) {
@@ -23,20 +29,17 @@ export class ContactsForm extends Form<{ email: string, phone: string }> {
     }
 
     /**
+     * Возвращает текущее значение телефона
+     */
+    get phone(): string {
+        return this._phoneInput.value;
+    }
+
+    /**
      * Устанавливает телефон
      */
     set phone(value: string) {
         this._phoneInput.value = value;
-    }
-
-    /**
-     * Возвращает значения формы
-     */
-    getValue(): { email: string, phone: string } {
-        return {
-            email: this._emailInput.value,
-            phone: this._phoneInput.value
-        };
     }
 
     /**
@@ -54,14 +57,6 @@ export class ContactsForm extends Form<{ email: string, phone: string }> {
      * Обработчик отправки формы
      */
     protected onSubmit(): void {
-        this._events.emit('contacts:submit', this.getValue());
+        this._events.emit('contacts:submit');
     }
-}
-
-/**
- * Фабрика для создания формы контактов
- */
-export function createContactsForm(events: IEvents): ContactsForm {
-    const template = cloneTemplate<HTMLElement>('#contacts');
-    return new ContactsForm(template, events);
 }

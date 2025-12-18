@@ -1,6 +1,6 @@
 import { Component } from '../../base/Component';
 import { IEvents } from '../../base/Events';
-import { cloneTemplate, ensureElement } from '../../../utils/utils';
+import { ensureElement } from '../../../utils/utils';
 
 /**
  * Сообщение об успешном заказе
@@ -35,12 +35,4 @@ export class SuccessView extends Component<{ total: number }> {
             element.textContent = value;
         }
     }
-}
-
-/**
- * Фабрика для создания сообщения об успехе
- */
-export function createSuccessView(events: IEvents): SuccessView {
-    const template = cloneTemplate<HTMLElement>('#success');
-    return new SuccessView(template, events);
 }

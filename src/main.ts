@@ -10,6 +10,7 @@ import { ProductCollection } from './components/models/ProductCollection';
 import { ShoppingCart } from './components/models/ShoppingCart';
 import { OrderManager } from './components/models/OrderManager';
 
+import {testProducts} from './tests/helpers/test-data';
 import { 
   Page, 
   Header, 
@@ -35,9 +36,6 @@ type PaymentChangeEvent = { payment: string };
 type AddressChangeEvent = { address: string };
 type EmailChangeEvent = { email: string };
 type PhoneChangeEvent = { phone: string };
-type OrderSubmitEvent = { payment: string, address: string };
-type ContactsSubmitEvent = { email: string, phone: string };
-
 /**
  * Фабрика для создания представлений
 */
@@ -205,8 +203,7 @@ class App {
   private successView: SuccessView;
 
   private viewFactory: ViewFactory;
-  
-  private currentForm: 'order' | 'contacts' | 'basket' | 'product' | null = null;
+  private clearAfterSubmit: Boolean = false;
 
   constructor(
     events: EventEmitter,
@@ -242,8 +239,21 @@ class App {
     
     // Загрузка товаров с сервера
     this.loadProducts();
+
+    // Первичная обновление форм
+    this.updateForms();
+    this.updateBasket();
   }
 
+  public setClearAfterSubmit(clearAfterSubmit: Boolean) {
+    this.clearAfterSubmit = clearAfterSubmit;
+  }
+
+  public getClearAfterSubmit() : Boolean {
+    return this.clearAfterSubmit;
+  }
+
+  //#region Инициализация страницы
   /**
    * Настройка всех обработчиков событий
    */
@@ -252,28 +262,29 @@ class App {
     this.productCollection.on('products:changed', this.renderCatalog.bind(this));
     this.productCollection.on('product:selected', this.showProductModal.bind(this));
     this.shoppingCart.on('basket:changed', this.updateBasket.bind(this));
-    this.orderManager.on('order:changed', this.updateForms.bind(this));
-    
+    this.orderManager.on('order:reset', this.updateForms.bind(this));
+    this.orderManager.on('order.payment:changed', this.updateOrderForm.bind(this));
+    this.orderManager.on('order.address:changed', this.updateOrderForm.bind(this));
+    this.orderManager.on('order.email:changed', this.updateContactsForm.bind(this));
+    this.orderManager.on('order.phone:changed', this.updateContactsForm.bind(this));
+
     // События от представлений с явной типизацией
     this.events.on<CardSelectEvent>('card:select', this.handleCardSelect.bind(this));
     this.events.on<CardActionEvent>('card:add', this.handleCardAdd.bind(this));
     this.events.on<CardActionEvent>('card:remove', this.handleCardRemove.bind(this));
     this.events.on<BasketRemoveEvent>('basket:remove', this.handleBasketRemove.bind(this));
-    
-    this.events.on('header:basket', this.openBasket.bind(this));
-    this.events.on('basket:order', this.openOrderForm.bind(this));
-    
-    this.events.on<OrderSubmitEvent>('order:submit', this.handleOrderSubmit.bind(this));
-    this.events.on<ContactsSubmitEvent>('contacts:submit', this.handleContactsSubmit.bind(this));
-    
     this.events.on<PaymentChangeEvent>('order.payment:change', this.handlePaymentChange.bind(this));
     this.events.on<AddressChangeEvent>('order.address:change', this.handleAddressChange.bind(this));
     this.events.on<EmailChangeEvent>('contacts.email:change', this.handleEmailChange.bind(this));
     this.events.on<PhoneChangeEvent>('contacts.phone:change', this.handlePhoneChange.bind(this));
     
+    this.events.on('order:submit', this.handleOrderSubmit.bind(this));
+    this.events.on('contacts:submit', this.handleContactsSubmit.bind(this));
+    this.events.on('header:basket', this.openBasket.bind(this));
+    this.events.on('basket:order', this.openOrderForm.bind(this));
     this.events.on('success:close', this.closeModal.bind(this));
   }
-  
+
   /**
    * Загрузка товаров с сервера
    */
@@ -296,7 +307,9 @@ class App {
     );
     this.page.catalog = cards;
   }
+  //#endregion
   
+  //#region Работа с карточкой
   /**
    * Открытие модального окна с товаром
    */
@@ -322,45 +335,7 @@ class App {
             disabled: false 
         };
     }
-    
-    this.currentForm = 'product';
     this.modal.open(this.previewCard.render());
-  }
-  
-  /**
-   * Обновление корзины и счетчика
-   */
-  private updateBasket(): void {
-    // Обновляем счетчик в шапке
-    this.header.counter = this.shoppingCart.getItemsCount();
-    
-    // Обновляем корзину (если она открыта)
-    if (this.currentForm === 'basket') {
-      this.updateBasketContent();
-    }
-  }
-  
-  /**
-   * Обновление содержимого корзины
-   */
-  private updateBasketContent(): void {
-    const items = this.shoppingCart.getItems();
-    
-    if (items.length === 0) {
-      this.basketView.items = [];
-      this.basketView.total = 0;
-      this.basketView.button = false;
-    } else {
-      const basketCards = items.map((item, index) => {
-        const card = viewFactory.getBasketCard(item);
-        card.index = index + 1;
-        return card.render();
-      });
-      
-      this.basketView.items = basketCards;
-      this.basketView.total = this.shoppingCart.getTotalPrice();
-      this.basketView.button = true;
-    }
   }
   
   /**
@@ -372,7 +347,43 @@ class App {
       this.productCollection.setSelectedProduct(product);
     }
   }
+  //#endregion
   
+  // #region Управление корзиной
+  /**
+   * Обновление корзины и счетчика
+   */
+  private updateBasket(): void {
+    // Обновляем счетчик в шапке
+    this.header.counter = this.shoppingCart.getItemsCount();
+    
+    // Обновляем корзину
+    this.updateBasketContent();
+  }
+  
+  /**
+   * Обновление содержимого корзины
+   */
+  private updateBasketContent(): void {
+    const items = this.shoppingCart.getItems();
+    
+    if (items.length === 0) {
+      this.basketView.items = [];
+      this.basketView.total = 0;
+      this.basketView.buttonEnabled = false;
+    } else {
+      const basketCards = items.map((item, index) => {
+        const card = viewFactory.getBasketCard(item);
+        card.index = index + 1;
+        return card.render();
+      });
+      
+      this.basketView.items = basketCards;
+      this.basketView.total = this.shoppingCart.getTotalPrice();
+      this.basketView.buttonEnabled = true;
+    }
+  }
+
   /**
    * Обработчик добавления товара в корзину
    */
@@ -381,7 +392,6 @@ class App {
     if (product) {
       this.shoppingCart.addItem(product);
       this.modal.close();
-      this.currentForm = null;
     }
   }
   
@@ -391,7 +401,6 @@ class App {
   private handleCardRemove(data: CardActionEvent): void {
     this.shoppingCart.removeItem(data.id);
     this.modal.close();
-    this.currentForm = null;
   }
   
   /**
@@ -405,134 +414,47 @@ class App {
    * Открытие корзины
    */
   private openBasket(): void {
-    this.updateBasketContent();
-    this.currentForm = 'basket';
     this.modal.open(this.basketView.render());
   }
+  //#endregion
   
+  //#region Оформление заказа
   /**
    * Открытие формы оформления заказа
    */
   private openOrderForm(): void {
-    // Восстанавливаем данные из OrderManager
-    const orderData = this.orderManager.getOrderData();
-    if (orderData.payment) {
-      this.orderForm.payment = orderData.payment;
-    }
-    if (orderData.address) {
-      this.orderForm.address = orderData.address;
-    }
-    
-    // Обновляем валидацию
-    this.updateOrderFormValidation();
-    
-    this.currentForm = 'order';
     this.modal.open(this.orderForm.render());
   }
   
   /**
    * Обработчик отправки формы заказа
    */
-  private handleOrderSubmit(data: OrderSubmitEvent): void {
-    this.orderManager.setPayment(data.payment as 'card' | 'cash');
-    this.orderManager.setAddress(data.address);
-    this.openContactsForm();
+  private handleOrderSubmit( ): void {
+    const errors = this.orderManager.validate();
+    const hasOrderErrors = !!(errors.payment || errors.address);
+    if(!hasOrderErrors) {
+      this.openContactsForm();
+    }
   }
   
   /**
    * Открытие формы контактов
    */
   private openContactsForm(): void {
-    // Восстанавливаем данные из OrderManager
-    const orderData = this.orderManager.getOrderData();
-    if (orderData.email) {
-      this.contactsForm.email = orderData.email;
-    }
-    if (orderData.phone) {
-      this.contactsForm.phone = orderData.phone;
-    }
-    
-    // Обновляем валидацию
-    this.updateContactsFormValidation();
-    
-    this.currentForm = 'contacts';
     this.modal.open(this.contactsForm.render());
   }
   
   /**
    * Обработчик отправки формы контактов
    */
-  private handleContactsSubmit(data: ContactsSubmitEvent): void {
-    this.orderManager.setEmail(data.email);
-    this.orderManager.setPhone(data.phone);
-    this.submitOrder();
-  }
-  
-  /**
-   * Обновление валидации форм
-   */
-  private updateForms(): void {
-    if (this.currentForm === 'order') {
-      this.updateOrderFormValidation();
-    } else if (this.currentForm === 'contacts') {
-      this.updateContactsFormValidation();
+  private handleContactsSubmit( ): void {
+    const errors = this.orderManager.validate();
+    const hasContactErrors = !!(errors.email || errors.phone);
+    if(!hasContactErrors) {
+      this.submitOrder();
     }
   }
-  
-  /**
-   * Проверка валидности формы заказа
-   */
-  private updateOrderFormValidation(): void {
-    const errors = this.orderManager.validate();
-    
-    const errorMessages = [];
-    if (errors.payment) errorMessages.push(errors.payment);
-    if (errors.address) errorMessages.push(errors.address);
-    
-    const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
-    const isValid = errorMessages.length === 0;
-    
-    // Передаём ошибки и состояние валидности в представление
-    this.orderForm.errors = errorText;
-    this.orderForm.valid = isValid;
-  }
-  
-  /**
-   * Проверка валидности формы контактов
-   */
-  private updateContactsFormValidation(): void {
-    const errors = this.orderManager.validate();
-    
-    const errorMessages = [];
-    if (errors.email) errorMessages.push(errors.email);
-    if (errors.phone) errorMessages.push(errors.phone);
-    
-    const errorText = errorMessages.length > 0 ? errorMessages.join(', ') : '';
-    const isValid = errorMessages.length === 0;
-    
-    // Передаём ошибки и состояние валидности в представление
-    this.contactsForm.errors = errorText;
-    this.contactsForm.valid = isValid;
-  }
-  
-  //#region Обработчики изменения полей форм
-  private handlePaymentChange(data: PaymentChangeEvent): void {
-    this.orderManager.setPayment(data.payment as 'card' | 'cash');
-  }
-  
-  private handleAddressChange(data: AddressChangeEvent): void {
-    this.orderManager.setAddress(data.address);
-  }
-  
-  private handleEmailChange(data: EmailChangeEvent): void {
-    this.orderManager.setEmail(data.email);
-  }
-  
-  private handlePhoneChange(data: PhoneChangeEvent): void {
-    this.orderManager.setPhone(data.phone);
-  }
-  //#endregion 
-  
+
   /**
    * Отправка заказа
    */
@@ -558,42 +480,89 @@ class App {
         total: this.shoppingCart.getTotalPrice(),
         items: this.shoppingCart.getItems().map(item => item.id)
       };
-      
+
       // Отправляем на сервер...
       const response = await this.appApi.submitOrder(orderRequest);
       
       // Показываем сообщение об успехе
       this.successView.total = response.total;
-      
-      // Очищаем корзину и данные заказа
-      this.shoppingCart.clear();
-      this.orderManager.clear();
-      
-      // Очищаем формы (в случае повторных заказов формы будут пустые)
-      this.orderForm.clear();
-      this.contactsForm.clear();
-      
-      this.currentForm = null;
+
       this.modal.open(this.successView.render());
-      
     } catch (error) {
       console.error('Ошибка оформления заказа:', error);
-      
-      // Отображаем ошибку через представление
-      const errorElement = document.createElement('div');
-      errorElement.textContent = error instanceof Error ? error.message : 'Ошибка оформления заказа. Попробуйте еще раз.';
-      errorElement.classList.add('error-message');
-      
-      this.modal.content.appendChild(errorElement);
+      this.modal.showError(error instanceof Error ? error.message : 'Ошибка оформления заказа. Попробуйте еще раз.');
+    } finally {
+      // Очищаем корзину
+      this.shoppingCart.clear();
+      // Оставляем или сбрасываем данные заказа перед следующей покупкой
+      if(this.clearAfterSubmit) {
+        this.orderManager.clear();
+      }
     }
   }
+  //#endregion
   
+  //#region Обработчики изменения полей форм
+  private handlePaymentChange(data: PaymentChangeEvent): void {
+    this.orderManager.setPayment(data.payment as 'card' | 'cash');
+  }
+  
+  private handleAddressChange(data: AddressChangeEvent): void {
+    this.orderManager.setAddress(data.address);
+  }
+  
+  private handleEmailChange(data: EmailChangeEvent): void {
+    this.orderManager.setEmail(data.email);
+  }
+  
+  private handlePhoneChange(data: PhoneChangeEvent): void {
+    this.orderManager.setPhone(data.phone);
+  }
+  //#endregion 
+
+  //#region Обработка событий изменения данных заказа (Любое изменение в модели -> обновление форм)
+  /**
+   * Обновление форм (биндится на сброс данных заказа)
+   */
+  private updateForms( ): void {
+    this.updateOrderForm();
+    this.updateContactsForm();
+  }
+  
+  /**
+   * Обновление данных формы заказа из модели
+   */
+  private updateOrderForm(): void {
+    const orderData = this.orderManager.getOrderData();
+    this.orderForm.payment = orderData.payment as string;
+    this.orderForm.address = orderData.address;
+    
+    const errors = this.orderManager.validate();
+    const orderErrors = [errors.payment, errors.address].filter(Boolean);
+    this.orderForm.errors = orderErrors.join(', ');
+    this.orderForm.valid = orderErrors.length === 0;
+  }
+  
+  /**
+   * Обновление данных формы контактов из модели
+   */
+  private updateContactsForm(): void {
+    const orderData = this.orderManager.getOrderData();
+    this.contactsForm.email = orderData.email;
+    this.contactsForm.phone = orderData.phone;
+    
+    const errors = this.orderManager.validate();
+    const contactErrors = [errors.email, errors.phone].filter(Boolean);
+    this.contactsForm.errors = contactErrors.join(', ');
+    this.contactsForm.valid = contactErrors.length === 0;
+  }
+  //#endregion
+
   /**
    * Закрытие модального окна
    */
   private closeModal(): void {
     this.modal.close();
-    this.currentForm = null;
   }
 }
 

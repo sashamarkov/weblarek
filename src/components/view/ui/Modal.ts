@@ -8,6 +8,7 @@ export class Modal {
     protected _content: HTMLElement;
     protected _closeButton: HTMLButtonElement;
 
+
     constructor(container: HTMLElement) {
         this._container = container;
         this._content = ensureElement<HTMLElement>('.modal__content', container);
@@ -52,5 +53,15 @@ export class Modal {
         if (event.target === this._container) {
             this.close();
         }
+    }
+
+    /**
+     * Показывает ошибку в модалке
+    */
+    public showError(errorMessage: string) {
+        const errorElement = document.createElement('div');
+        errorElement.classList.add('error-message')
+        errorElement.textContent = errorMessage;
+        this.content.appendChild(errorElement);
     }
 }

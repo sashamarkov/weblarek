@@ -1,7 +1,6 @@
 import { Card } from '../base/Card';
 import { Product } from '../../../types';
 import { IEvents } from '../../base/Events';
-import { cloneTemplate } from '../../../utils/utils';
 
 /**
  * Карточка товара в каталоге

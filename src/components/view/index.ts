@@ -8,11 +8,11 @@ export { PreviewCard } from './cards/PreviewCard';
 export { BasketCard } from './cards/BasketCard';
 
 // Формы
-export { BasketView } from './forms/BasketView';
 export { OrderForm } from './forms/OrderForm';
 export { ContactsForm } from './forms/ContactsForm';
 
 // UI компоненты
+export { BasketView } from './ui/BasketView';
 export { SuccessView } from './ui/SuccessView';
 export { Modal } from './ui/Modal';
 export { Page } from './ui/Page';

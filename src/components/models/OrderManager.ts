@@ -11,22 +11,22 @@ export class OrderManager extends EventEmitter {
 
   setPayment(payment: 'card' | 'cash'): void {
     this.orderData.payment = payment;
-    this.emit('order:changed');
+    this.emit('order.payment:changed');
   }
 
   setAddress(address: string): void {
     this.orderData.address = address;
-    this.emit('order:changed');
+    this.emit('order.address:changed');
   }
 
   setEmail(email: string): void {
     this.orderData.email = email;
-    this.emit('order:changed');
+    this.emit('order.email:changed');
   }
 
   setPhone(phone: string): void {
     this.orderData.phone = phone;
-    this.emit('order:changed');
+    this.emit('order.phone:changed');
   }
 
   getOrderData(): OrderData {
@@ -40,7 +40,7 @@ export class OrderManager extends EventEmitter {
       phone: '',
       address: ''
     };
-    this.emit('order:changed');
+    this.emit('order:reset');
   }
 
   validate(): ValidationErrors {

@@ -1,6 +1,6 @@
 import { Form } from '../base/Form';
 import { IEvents } from '../../base/Events';
-import { cloneTemplate, ensureElement } from '../../../utils/utils';
+import { ensureElement } from '../../../utils/utils';
 
 /**
  * Форма оформления заказа (выбор оплаты и адрес)
@@ -8,7 +8,6 @@ import { cloneTemplate, ensureElement } from '../../../utils/utils';
 export class OrderForm extends Form<{ payment: string, address: string }> {
     protected _paymentButtons: NodeListOf<HTMLButtonElement>;
     protected _addressInput: HTMLInputElement;
-    protected _selectedPayment: string = '';
 
     constructor(container: HTMLElement, events?: IEvents) {
         super(container, events);
@@ -18,14 +17,9 @@ export class OrderForm extends Form<{ payment: string, address: string }> {
         
         this._paymentButtons.forEach(button => {
             button.addEventListener('click', () => {
-                this.selectPayment(button.name as 'card' | 'cash');
-            });
-        });
-        
-        // Оработчик изменения адреса
-        this._addressInput.addEventListener('input', () => {
-            this._events.emit('order.address:change', { 
-                address: this._addressInput.value 
+                this.selectPayment(button.name);
+                // Уведомляем об изменении способа оплаты, если кликнули на кнопку
+                this._events.emit('order.payment:change', { payment: button.name });
             });
         });
     }
@@ -35,42 +29,43 @@ export class OrderForm extends Form<{ payment: string, address: string }> {
     */
     clear(): void {
         super.clear(); // очистка инпутов
-        // Снимаем выделение со всех кнопок оплаты
-        this._paymentButtons.forEach(button => {
-            button.classList.remove('button_alt-active');
-        });
+        this.clearPayment();
     }
 
-
     /**
-     * Выбирает способ оплаты
+     * Выбирает способ оплаты (подсвечиваем кнопку)
      */
-    private selectPayment(method: 'card' | 'cash') {
-        this._selectedPayment = method;
-        
-        // Снимаем выделение со всех кнопок
-        this._paymentButtons.forEach(button => {
-            button.classList.remove('button_alt-active');
-        });
-    
+    private selectPayment(payment:string) {
+        this.clearPayment();
         const selectedButton = Array.from(this._paymentButtons).find(
-            button => button.name === method
+            button => button.name === payment
         );
         if (selectedButton) {
             selectedButton.classList.add('button_alt-active');
         }
-        
-        // Форсим событие 
-        this._events.emit('order.payment:change', { payment: method });
+    }
+
+    /*
+    * Сбрасывает выбранный способ оплаты
+    */
+    private clearPayment() {
+        this._paymentButtons.forEach(button => {
+            button.classList.remove('button_alt-active');
+        });
     }
 
     /**
      * Устанавливает способ оплаты
      */
     set payment(value: string) {
-        if (value === 'card' || value === 'cash') {
-            this.selectPayment(value);
-        }
+        this.selectPayment(value);
+    }
+
+    /**
+     * Возвращает введенный адрес
+     */
+    get address(): string {
+        return this._addressInput.value;
     }
 
     /**
@@ -78,16 +73,6 @@ export class OrderForm extends Form<{ payment: string, address: string }> {
      */
     set address(value: string) {
         this._addressInput.value = value;
-    }
-
-    /**
-     * Возвращает значения формы
-     */
-    getValue(): { payment: string, address: string } {
-        return {
-            payment: this._selectedPayment,
-            address: this._addressInput.value
-        };
     }
 
     /**
@@ -103,14 +88,6 @@ export class OrderForm extends Form<{ payment: string, address: string }> {
      * Обработчик отправки формы
      */
     protected onSubmit(): void {
-        this._events.emit('order:submit', this.getValue());
+        this._events.emit('order:submit');
     }
-}
-
-/**
- * Фабрика для создания формы заказа
- */
-export function createOrderForm(events: IEvents): OrderForm {
-    const template = cloneTemplate<HTMLElement>('#order');
-    return new OrderForm(template, events);
 }
