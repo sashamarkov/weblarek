@@ -10,7 +10,6 @@ import { ProductCollection } from './components/models/ProductCollection';
 import { ShoppingCart } from './components/models/ShoppingCart';
 import { OrderManager } from './components/models/OrderManager';
 
-import {testProducts} from './tests/helpers/test-data';
 import { 
   Page, 
   Header, 
@@ -24,7 +23,7 @@ import {
   BasketCard,
 } from './components/view';
 
-import { Product, OrderRequest, ValidationErrors} from './types';
+import { Product, OrderRequest } from './types';
 import { ensureElement, cloneTemplate } from './utils/utils';
 //#endregion
 
@@ -184,7 +183,6 @@ class ViewFactory {
 // Инициализация приложения
 class App {
   private events: EventEmitter;
-  private api: Api;
   private appApi: AppAPI;
   
   private productCollection: ProductCollection;
@@ -203,11 +201,9 @@ class App {
   private successView: SuccessView;
 
   private viewFactory: ViewFactory;
-  private clearAfterSubmit: Boolean = false;
 
   constructor(
     events: EventEmitter,
-    api: Api,
     appApi: AppAPI,
     productCollection: ProductCollection,
     shoppingCart: ShoppingCart,
@@ -215,7 +211,6 @@ class App {
     viewFactory: ViewFactory
   ) {
     this.events = events;
-    this.api = api;
     this.appApi = appApi;
     this.productCollection = productCollection;
     this.shoppingCart = shoppingCart;
@@ -239,18 +234,6 @@ class App {
     
     // Загрузка товаров с сервера
     this.loadProducts();
-
-    // Первичная обновление форм
-    this.updateForms();
-    this.updateBasket();
-  }
-
-  public setClearAfterSubmit(clearAfterSubmit: Boolean) {
-    this.clearAfterSubmit = clearAfterSubmit;
-  }
-
-  public getClearAfterSubmit() : Boolean {
-    return this.clearAfterSubmit;
   }
 
   //#region Инициализация страницы
@@ -262,11 +245,9 @@ class App {
     this.productCollection.on('products:changed', this.renderCatalog.bind(this));
     this.productCollection.on('product:selected', this.showProductModal.bind(this));
     this.shoppingCart.on('basket:changed', this.updateBasket.bind(this));
-    this.orderManager.on('order:reset', this.updateForms.bind(this));
-    this.orderManager.on('order.payment:changed', this.updateOrderForm.bind(this));
-    this.orderManager.on('order.address:changed', this.updateOrderForm.bind(this));
-    this.orderManager.on('order.email:changed', this.updateContactsForm.bind(this));
-    this.orderManager.on('order.phone:changed', this.updateContactsForm.bind(this));
+    this.orderManager.on('order:reset', this.resetForms.bind(this));
+    this.orderManager.on('order.details:changed', this.updateOrderForm.bind(this, true));
+    this.orderManager.on('order.contacts:changed', this.updateContactsForm.bind(this, true));
 
     // События от представлений с явной типизацией
     this.events.on<CardSelectEvent>('card:select', this.handleCardSelect.bind(this));
@@ -367,21 +348,14 @@ class App {
   private updateBasketContent(): void {
     const items = this.shoppingCart.getItems();
     
-    if (items.length === 0) {
-      this.basketView.items = [];
-      this.basketView.total = 0;
-      this.basketView.buttonEnabled = false;
-    } else {
-      const basketCards = items.map((item, index) => {
+    const basketCards = items.map((item, index) => {
         const card = viewFactory.getBasketCard(item);
         card.index = index + 1;
         return card.render();
-      });
+    });
       
-      this.basketView.items = basketCards;
-      this.basketView.total = this.shoppingCart.getTotalPrice();
-      this.basketView.buttonEnabled = true;
-    }
+    this.basketView.items = basketCards;
+    this.basketView.total = this.shoppingCart.getTotalPrice();
   }
 
   /**
@@ -483,21 +457,15 @@ class App {
 
       // Отправляем на сервер...
       const response = await this.appApi.submitOrder(orderRequest);
-      
+
+      this.shoppingCart.clear();
+      this.orderManager.clear();
+
       // Показываем сообщение об успехе
       this.successView.total = response.total;
-
       this.modal.open(this.successView.render());
     } catch (error) {
       console.error('Ошибка оформления заказа:', error);
-      this.modal.showError(error instanceof Error ? error.message : 'Ошибка оформления заказа. Попробуйте еще раз.');
-    } finally {
-      // Очищаем корзину
-      this.shoppingCart.clear();
-      // Оставляем или сбрасываем данные заказа перед следующей покупкой
-      if(this.clearAfterSubmit) {
-        this.orderManager.clear();
-      }
     }
   }
   //#endregion
@@ -524,37 +492,43 @@ class App {
   /**
    * Обновление форм (биндится на сброс данных заказа)
    */
-  private updateForms( ): void {
-    this.updateOrderForm();
-    this.updateContactsForm();
+  private resetForms( ): void {
+    // При сбросе форм не показываем ошибки, т.к. поля пустые, только при редактировании 
+    // (одна логика отображения ошибок для первого заказа и следующих)
+    this.updateOrderForm(false);
+    this.updateContactsForm(false);
   }
   
   /**
    * Обновление данных формы заказа из модели
    */
-  private updateOrderForm(): void {
+  private updateOrderForm(showErrors: boolean): void {
     const orderData = this.orderManager.getOrderData();
     this.orderForm.payment = orderData.payment as string;
     this.orderForm.address = orderData.address;
-    
+
     const errors = this.orderManager.validate();
     const orderErrors = [errors.payment, errors.address].filter(Boolean);
-    this.orderForm.errors = orderErrors.join(', ');
     this.orderForm.valid = orderErrors.length === 0;
+    if(showErrors) {
+      this.orderForm.errors = orderErrors.join(', ');
+    }
   }
   
   /**
    * Обновление данных формы контактов из модели
    */
-  private updateContactsForm(): void {
+  private updateContactsForm(showErrors: boolean): void {
     const orderData = this.orderManager.getOrderData();
     this.contactsForm.email = orderData.email;
     this.contactsForm.phone = orderData.phone;
-    
+
     const errors = this.orderManager.validate();
     const contactErrors = [errors.email, errors.phone].filter(Boolean);
-    this.contactsForm.errors = contactErrors.join(', ');
     this.contactsForm.valid = contactErrors.length === 0;
+    if(showErrors) {
+      this.contactsForm.errors = contactErrors.join(', ');
+    }
   }
   //#endregion
 
@@ -580,7 +554,6 @@ const viewFactory = new ViewFactory(events);
 // Запуск приложения
 new App(
   events,
-  api,
   appApi,
   productCollection,
   shoppingCart,

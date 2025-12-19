@@ -22,6 +22,8 @@ export class BasketView extends Component<{ items: HTMLElement[], total: number 
         this._button.addEventListener('click', () => {
             this._events.emit('basket:order');
         });
+        
+        this.items = [];
     }
 
     /**
@@ -36,6 +38,7 @@ export class BasketView extends Component<{ items: HTMLElement[], total: number 
             emptyMessage.classList.add('basket__empty');
             this._list.append(emptyMessage);
         }
+        this._button.disabled = (value.length === 0);
     }
 
     /**
@@ -43,13 +46,6 @@ export class BasketView extends Component<{ items: HTMLElement[], total: number 
      */
     set total(value: number) {
         this.setText(this._total, `${value} синапсов`);
-    }
-
-    /**
-     * Блокирует или разблокирует кнопку оформления
-     */
-    set buttonEnabled(state: boolean) {
-        this._button.disabled = !state;
     }
 
     /**
